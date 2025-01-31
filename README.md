@@ -1,1 +1,1 @@
-# excel-file-uploader-lwc
+# AnkerPriceListUploader-lwc
