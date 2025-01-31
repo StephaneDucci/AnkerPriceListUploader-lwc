@@ -1,1 +1,0 @@
-# AnkerPriceListUploader-lwc
