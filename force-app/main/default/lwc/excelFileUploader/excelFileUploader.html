@@ -1,0 +1,11 @@
+<template>
+    <lightning-card title="Upload File Excel">
+        <div class="slds-m-around_medium">
+            <lightning-input type="file" accept=".xls,.xlsx" label="Seleziona un file" 
+                onchange={handleFileChange} class="custom-file-input">
+            </lightning-input>
+
+            <p class="file-name-display slds-m-top_small">📄 File selezionato: <strong>{fileName}</strong></p>
+        </div>
+    </lightning-card>
+</template>

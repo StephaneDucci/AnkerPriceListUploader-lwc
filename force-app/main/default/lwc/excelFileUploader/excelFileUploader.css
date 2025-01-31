@@ -1,0 +1,9 @@
+.custom-file-input {
+    --slds-c-input-color-border: #0070d2; /* Blu Salesforce */
+    --slds-c-input-text-color: #0070d2;
+}
+
+.file-name-display {
+    font-size: 16px;
+    color: #2e2e2e;
+}
