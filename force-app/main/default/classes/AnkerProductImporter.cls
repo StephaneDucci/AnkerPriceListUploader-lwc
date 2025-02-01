@@ -1,4 +1,5 @@
 public with sharing class AnkerProductImporter {
+
     @AuraEnabled
     public static List<Anker_Product__c> importAnkerProducts(List<Map<String, String>> productData) {
         List<Anker_Product__c> productsToInsert = new List<Anker_Product__c>();
@@ -11,23 +12,19 @@ public with sharing class AnkerProductImporter {
             System.debug('🗑️ Tutti i record precedenti sono stati eliminati.');
         } catch (DmlException e) {
             System.debug('❌ Errore nell\'eliminazione dei vecchi record: ' + e.getMessage());
+            return new List<Anker_Product__c>();
         }
 
         for (Map<String, String> row : productData) {
             try {
-                // Filtra i prodotti che non devono essere importati
                 if (row.containsKey('Alc %') && (row.get('Alc %') == null || row.get('Alc %').trim() == '' || Decimal.valueOf(row.get('Alc %')) == 0)) {
-                    System.debug('⚠️ Prodotto ignorato: Alc % è 0 o vuoto - SKU: ' + row.get('SKU'));
                     continue;
                 }
                 if (row.containsKey('Main Category') && (row.get('Main Category') == null || row.get('Main Category').trim() == '')) {
-                    System.debug('⚠️ Prodotto ignorato: Main Category non definita - SKU: ' + row.get('SKU'));
                     continue;
                 }
 
                 Anker_Product__c product = new Anker_Product__c();
-
-                // Mappatura dei campi
                 product.SKU__c = row.get('SKU');
                 product.Description__c = row.get('Description');
                 product.Case_Size__c = row.containsKey('Case size') && row.get('Case size') != null && row.get('Case size') != '' ? Decimal.valueOf(row.get('Case size')) : null;
@@ -40,9 +37,7 @@ public with sharing class AnkerProductImporter {
                 product.COO__c = row.get('COO');
                 product.Barcode_Bottle__c = row.get('Barcode bottle');
                 
-                // Se il Barcode Outercase è più lungo di 14 caratteri, lo lasciamo vuoto
                 if (row.containsKey('Barcode Outercase') && row.get('Barcode Outercase') != null && row.get('Barcode Outercase').length() > 14) {
-                    System.debug('⚠️ Barcode Outercase troppo lungo, lasciato vuoto - SKU: ' + row.get('SKU'));
                     product.Barcode_Outercase__c = null;
                 } else {
                     product.Barcode_Outercase__c = row.get('Barcode Outercase');
@@ -66,4 +61,23 @@ public with sharing class AnkerProductImporter {
 
         return productsToInsert;
     }
+
+    @AuraEnabled
+    public static void resetAnkerProducts() {
+        try {
+            System.debug('🔄 Tentativo di eliminazione di tutti i record Anker_Product__c...');
+            Integer recordsDeleted = [SELECT COUNT() FROM Anker_Product__c];
+    
+            if (recordsDeleted > 0) {
+                delete [SELECT Id FROM Anker_Product__c];
+                System.debug('✅ Eliminati ' + recordsDeleted + ' record.');
+            } else {
+                System.debug('⚠️ Nessun record da eliminare.');
+            }
+        } catch (DmlException e) {
+            System.debug('❌ Errore durante la cancellazione dei record: ' + e.getMessage());
+            throw new AuraHandledException('Errore durante la cancellazione: ' + e.getMessage());
+        }
+    }
+    
 }

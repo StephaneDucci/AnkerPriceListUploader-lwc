@@ -7,8 +7,13 @@
 
             <p class="file-name-display slds-m-top_small">📄 File selezionato: <strong>{fileName}</strong></p>
 
-            <!-- ✅ Aggiunto il pulsante per avviare l'import -->
-            <lightning-button label="Importa" onclick={handleImport} variant="brand" class="slds-m-top_medium"></lightning-button>
+            <div class="slds-m-top_medium">
+                <lightning-button label="Importa" onclick={handleImport} variant="brand"></lightning-button>
+                <lightning-button label="Reset Old Anker Product List" onclick={handleResetDataset} variant="destructive" class="slds-m-left_small"></lightning-button>            
+            </div>
+
+            <!-- ✅ Messaggio di risultato dell'importazione -->
+            <p class="slds-m-top_medium" if:true={importMessage}>{importMessage}</p>
         </div>
     </lightning-card>
 </template>

@@ -1,13 +1,19 @@
+// Import standard di LWC
 import { LightningElement, wire, track } from 'lwc';
+
+// Import delle risorse statiche
 import sheetJS from '@salesforce/resourceUrl/SheetJS';
 import { loadScript } from 'lightning/platformResourceLoader';
+
+// Import dei metodi Apex
 import importAnkerProducts from '@salesforce/apex/AnkerProductImporter.importAnkerProducts';
-import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import resetAnkerProducts from '@salesforce/apex/AnkerProductImporter.resetAnkerProducts';
 
 export default class ExcelFileUploader extends LightningElement {
     fileName = 'Nessun file selezionato';
     data = [];
     sheetJsInitialized = false;
+    importMessage = '';
 
     connectedCallback() {
         if (!this.sheetJsInitialized) {
@@ -37,10 +43,10 @@ export default class ExcelFileUploader extends LightningElement {
             return;
         }
 
+        this.data = []; // Pulisce i dati prima di caricarne di nuovi
         const reader = new FileReader();
         reader.onload = (event) => {
             console.log('📖 File letto correttamente, elaborazione in corso...');
-
             const binaryStr = event.target.result;
             let workbook;
             try {
@@ -52,13 +58,11 @@ export default class ExcelFileUploader extends LightningElement {
             }
 
             const sheetName = workbook.SheetNames[0]; // Prende il primo foglio
-            //console.log(`📄 Foglio selezionato: ${sheetName}`);
             const sheet = workbook.Sheets[sheetName];
 
             let jsonData;
             try {
-                jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" }); // Legge con valori di default per celle vuote
-                //console.log('📊 Dati grezzi (prima della pulizia):', JSON.stringify(jsonData, null, 2));
+                jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
             } catch (error) {
                 console.error('❌ Errore nella conversione in JSON:', error);
                 return;
@@ -69,21 +73,14 @@ export default class ExcelFileUploader extends LightningElement {
                 return;
             }
 
-            //console.log(`📊 Numero di righe prima della rimozione delle prime 11: ${jsonData.length}`);
             jsonData = jsonData.slice(11); // Rimuove le prime 11 righe
-            //console.log(`📊 Numero di righe dopo la rimozione: ${jsonData.length}`);
-
-            jsonData = jsonData.slice(0, 100); // Limita a 100 righe per test
-            //console.log('📊 Dati dopo la rimozione delle prime 11 righe:', JSON.stringify(jsonData, null, 2));
+            jsonData = jsonData.slice(0,500); // Limita l'import a 500 record
 
             if (!jsonData[0]) {
                 console.error('❌ Nessuna intestazione trovata.');
                 return;
             }
 
-            //console.log('🛠️ Intestazioni originali:', jsonData[0]);
-
-            // Definizione della mappa delle colonne
             const fieldMapping = {
                 'sku': 'SKU',
                 'description': 'Description',
@@ -99,18 +96,13 @@ export default class ExcelFileUploader extends LightningElement {
                 'barcode outercase': 'Barcode Outercase'
             };
 
-            // Processa le intestazioni
             const headers = jsonData[0].map(h => h ? h.toLowerCase().trim() : '');
-            //console.log('🛠️ Intestazioni processate:', headers);
-
             const mappedIndices = {};
             headers.forEach((h, index) => {
                 if (fieldMapping[h]) {
                     mappedIndices[fieldMapping[h]] = index;
                 }
             });
-
-            //console.log('🔎 Indici mappati:', mappedIndices);
 
             if (Object.keys(mappedIndices).length === 0) {
                 console.error('❌ Nessuna colonna valida trovata.');
@@ -126,35 +118,67 @@ export default class ExcelFileUploader extends LightningElement {
             });
 
             this.data = processedData;
-            //console.log('✅ Dati elaborati (finali):', JSON.stringify(this.data, null, 2));
         };
 
         reader.readAsBinaryString(file);
     }
     
     handleImport() {
-        console.log('🔄 handleImport() chiamato!'); // ✅ Debug per verificare se la funzione viene eseguita
+        console.log('🔄 handleImport() chiamato!');
+        console.log('📊 Dati inviati ad Apex:', JSON.stringify(this.data, null, 2));
+    
+        if (!this.data || this.data.length === 0) {
+            console.error('❌ Nessun dato disponibile per l\'importazione.');
+            this.importMessage = '❌ Nessun dato da importare. Carica un file valido.';
+            return;
+        }
     
         importAnkerProducts({ productData: this.data })
             .then(result => {
-                console.log('✅ Importazione completata con successo!', result);
-                this.dispatchEvent(
-                    new ShowToastEvent({
-                        title: 'Successo',
-                        message: `${result.length} prodotti importati con successo!`,
-                        variant: 'success'
-                    })
-                );
+                console.log('📩 Risultato ricevuto da Apex:', result);
+    
+                if (!result || result.length === undefined) {
+                    console.error('❌ La risposta di Apex non è valida:', result);
+                    this.importMessage = '❌ Errore: risposta non valida da Salesforce.';
+                    return;
+                }
+    
+                console.log('✅ Importazione completata con successo!');
+                this.importMessage = `✅ ${result.length} prodotti importati con successo!`;
             })
             .catch(error => {
                 console.error('❌ Errore durante l\'importazione:', error);
-                this.dispatchEvent(
-                    new ShowToastEvent({
-                        title: 'Errore',
-                        message: 'Errore durante l\'importazione dei dati.',
-                        variant: 'error'
-                    })
-                );
+    
+                let errorMessage = '❌ Errore durante l\'importazione dei dati.';
+                if (error.body && error.body.message) {
+                    errorMessage = `❌ Errore: ${error.body.message}`;
+                }
+    
+                this.importMessage = errorMessage;
             });
     }
+    
+    handleResetDataset() {
+        console.log('🔄 handleResetDataset() chiamato!');
+    
+        resetAnkerProducts()
+            .then(() => {
+                console.log('✅ Reset completato con successo!');
+                this.importMessage = '✅ Dataset eliminato con successo!';
+            })
+            .catch(error => {
+                console.error('❌ Errore durante il reset:', error);
+    
+                let errorMessage = '❌ Errore durante il reset dei dati.';
+                if (error.body) {
+                    errorMessage = `❌ Errore: ${JSON.stringify(error.body)}`;
+                }
+    
+                this.importMessage = errorMessage;
+            })
+            .finally(() => {
+                console.log('🔚 Operazione di reset completata.');
+            });
+    }
+    
 }
