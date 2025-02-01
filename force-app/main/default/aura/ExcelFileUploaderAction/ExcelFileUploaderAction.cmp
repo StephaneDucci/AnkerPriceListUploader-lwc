@@ -1,0 +1,3 @@
+<aura:component implements="force:lightningQuickActionWithoutHeader,force:hasRecordId,flexipage:availableForAllPageTypes" access="global">
+    <c:excelFileUploader />
+</aura:component>

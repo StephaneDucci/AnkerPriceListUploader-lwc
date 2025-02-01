@@ -1,0 +1,12 @@
+{
+  "packageDirectories": [
+    {
+      "path": "Anker Products",
+      "default": true
+    }
+  ],
+  "name": "Anker_Product__c",
+  "namespace": "",
+  "sfdcLoginUrl": "Anker Product",
+  "sourceApiVersion": "59.0"
+}
