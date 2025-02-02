@@ -1,18 +1,37 @@
 <template>
     <lightning-card title="Upload File Excel">
         <div class="slds-m-around_medium">
+            <!-- Selezione del file Excel -->
             <lightning-input type="file" accept=".xls,.xlsx" label="Seleziona un file" 
                 onchange={handleFileChange} class="custom-file-input">
             </lightning-input>
 
+            <!-- Visualizzazione del nome del file selezionato -->
             <p class="file-name-display slds-m-top_small">📄 File selezionato: <strong>{fileName}</strong></p>
 
+            <!-- Sezione per specificare il numero massimo di record e opzione per includere prodotti non disponibili -->
+            <div class="slds-grid slds-gutters slds-m-top_medium">
+                <div class="slds-col">
+                    <!-- Input per specificare il numero massimo di record da importare -->
+                    <lightning-input type="number" label="Max records to import"
+                        value={maxRecords} onchange={handleMaxRecordsChange} class="slds-m-bottom_medium" style="width: 150px;">
+                    </lightning-input>
+                </div>
+                <div class="slds-col">
+                    <!-- Checkbox per includere o escludere prodotti non disponibili -->
+                    <lightning-input type="checkbox" label="Includere i prodotti N/A?" 
+                        checked={includeUnavailable} onchange={handleIncludeUnavailableChange}>
+                    </lightning-input>
+                </div>
+            </div>
+
+            <!-- Pulsanti di azione: Importa e Reset -->
             <div class="slds-m-top_medium">
                 <lightning-button label="Importa" onclick={handleImport} variant="brand"></lightning-button>
                 <lightning-button label="Reset Old Anker Product List" onclick={handleResetDataset} variant="destructive" class="slds-m-left_small"></lightning-button>            
             </div>
 
-            <!-- ✅ Messaggio di risultato dell'importazione -->
+            <!-- Messaggio di conferma o errore sull'importazione -->
             <p class="slds-m-top_medium" if:true={importMessage}>{importMessage}</p>
         </div>
     </lightning-card>

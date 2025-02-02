@@ -10,10 +10,15 @@ import importAnkerProducts from '@salesforce/apex/AnkerProductImporter.importAnk
 import resetAnkerProducts from '@salesforce/apex/AnkerProductImporter.resetAnkerProducts';
 
 export default class ExcelFileUploader extends LightningElement {
-    fileName = 'Nessun file selezionato';
-    data = [];
+    // fileName = 'Nessun file selezionato';
+    // data = [];
+    // sheetJsInitialized = false;
+    // importMessage = '';
+    @track fileName = 'Nessun file selezionato';
+    @track data = [];
+    @track importMessage = '';
+    @track maxRecords = 500; // ✅ Valore di default per il numero massimo di record
     sheetJsInitialized = false;
-    importMessage = '';
 
     connectedCallback() {
         if (!this.sheetJsInitialized) {
@@ -28,12 +33,27 @@ export default class ExcelFileUploader extends LightningElement {
         }
     }
 
+    handleIncludeUnavailableChange(event) {
+        this.includeUnavailable = event.target.checked;
+        console.log(`🔘 Includere i prodotti N/A?: ${this.includeUnavailable}`);
+    }
+
     handleFileChange(event) {
         const file = event.target.files[0];
         if (file) {
             this.fileName = file.name;
             console.log(`📂 File selezionato: ${this.fileName}`);
             this.readExcelFile(file);
+        }
+    }
+
+    handleMaxRecordsChange(event) {
+        const value = event.target.value;
+        if (value > 0) {
+            this.maxRecords = parseInt(value, 10);
+            console.log(`🔢 Numero massimo di record impostato: ${this.maxRecords}`);
+        } else {
+            this.maxRecords = 500; // Se il valore non è valido, usa quello di default
         }
     }
 
@@ -74,7 +94,9 @@ export default class ExcelFileUploader extends LightningElement {
             }
 
             jsonData = jsonData.slice(11); // Rimuove le prime 11 righe
-            jsonData = jsonData.slice(0,500); // Limita l'import a 500 record
+            // jsonData = jsonData.slice(0,500); // Limita l'import a 500 record
+            // jsonData = jsonData.slice(0, this.maxRecords); // ✅ Usa il numero specificato dall'utente
+
 
             if (!jsonData[0]) {
                 console.error('❌ Nessuna intestazione trovata.');
@@ -125,15 +147,30 @@ export default class ExcelFileUploader extends LightningElement {
     
     handleImport() {
         console.log('🔄 handleImport() chiamato!');
-        console.log('📊 Dati inviati ad Apex:', JSON.stringify(this.data, null, 2));
+        console.log('📊 Dati totali prima del filtro:', this.data.length);
     
         if (!this.data || this.data.length === 0) {
             console.error('❌ Nessun dato disponibile per l\'importazione.');
             this.importMessage = '❌ Nessun dato da importare. Carica un file valido.';
             return;
         }
+
+        // ✅ Trova dinamicamente il nome corretto del campo "Comment/Remark" ignorando maiuscole/minuscole
+        let commentKey = Object.keys(this.data[0]).find(key => key.trim().toLowerCase() === 'comment/remark');
     
-        importAnkerProducts({ productData: this.data })
+        // ✅ Applica il filtro per escludere i prodotti "Currently Not Available" se necessario
+        let filteredData = this.data.filter(product => 
+            this.includeUnavailable || (commentKey && String(product[commentKey]).trim().toLowerCase() !== 'currently not available')
+        );
+        
+        console.log('📊 Dati totali dopo il filtro:', filteredData.length);
+        
+        // ✅ Applica il limite dei record dopo il filtro
+        let dataToImport = filteredData.slice(0, this.maxRecords);
+
+        // console.log(`📊 Importando ${dataToImport.length} record su un totale di ${filteredData.length}`);
+    
+        importAnkerProducts({ productData: dataToImport })
             .then(result => {
                 console.log('📩 Risultato ricevuto da Apex:', result);
     
