@@ -10,14 +10,15 @@
             <p class="file-name-display slds-m-top_small">📄 File selezionato: <strong>{fileName}</strong></p>
 
             <!-- Sezione per specificare il numero massimo di record e opzione per includere prodotti non disponibili -->
-            <div class="slds-grid slds-gutters slds-m-top_medium">
-                <div class="slds-col">
+            <div class="slds-grid slds-wrap slds-gutters slds-m-top_medium">
+                <div class="slds-col slds-size_1-of-2">
                     <!-- Input per specificare il numero massimo di record da importare -->
                     <lightning-input type="number" label="Max records to import"
-                        value={maxRecords} onchange={handleMaxRecordsChange} class="slds-m-bottom_medium" style="width: 150px;">
+                        value={maxRecords} onchange={handleMaxRecordsChange} 
+                        class="slds-m-bottom_medium" style="width: 150px;">
                     </lightning-input>
                 </div>
-                <div class="slds-col">
+                <div class="slds-col slds-size_1-of-2 slds-align_absolute-center">
                     <!-- Checkbox per includere o escludere prodotti non disponibili -->
                     <lightning-input type="checkbox" label="Includere i prodotti N/A?" 
                         checked={includeUnavailable} onchange={handleIncludeUnavailableChange}>
@@ -28,7 +29,8 @@
             <!-- Pulsanti di azione: Importa e Reset -->
             <div class="slds-m-top_medium">
                 <lightning-button label="Importa" onclick={handleImport} variant="brand"></lightning-button>
-                <lightning-button label="Reset Old Anker Product List" onclick={handleResetDataset} variant="destructive" class="slds-m-left_small"></lightning-button>            
+                <lightning-button label="Reset Old Anker Product List" onclick={handleResetDataset} variant="destructive" class="slds-m-left_small"></lightning-button>    
+                <lightning-button label="Reset Anker Categories" onclick={handleResetCategory} variant="destructive" class="slds-m-left_small"></lightning-button>            
             </div>
 
             <!-- Messaggio di conferma o errore sull'importazione -->

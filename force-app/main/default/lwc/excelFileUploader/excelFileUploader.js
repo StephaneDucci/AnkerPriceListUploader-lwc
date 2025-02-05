@@ -8,16 +8,15 @@ import { loadScript } from 'lightning/platformResourceLoader';
 // Import dei metodi Apex
 import importAnkerProducts from '@salesforce/apex/AnkerProductImporter.importAnkerProducts';
 import resetAnkerProducts from '@salesforce/apex/AnkerProductImporter.resetAnkerProducts';
+import importAnkerCategories from '@salesforce/apex/AnkerProductImporter.importAnkerCategories';
+import resetAnkerCategories from '@salesforce/apex/AnkerProductImporter.resetAnkerCategories';
+// import saveCategories from '@salesforce/apex/AnkerCategoryController.saveCategories';
 
 export default class ExcelFileUploader extends LightningElement {
-    // fileName = 'Nessun file selezionato';
-    // data = [];
-    // sheetJsInitialized = false;
-    // importMessage = '';
     @track fileName = 'Nessun file selezionato';
     @track data = [];
     @track importMessage = '';
-    @track maxRecords = 500; // ✅ Valore di default per il numero massimo di record
+    @track includeUnavailable = false; // ✅ Variabile per la checkbox
     sheetJsInitialized = false;
 
     connectedCallback() {
@@ -93,10 +92,7 @@ export default class ExcelFileUploader extends LightningElement {
                 return;
             }
 
-            jsonData = jsonData.slice(11); // Rimuove le prime 11 righe
-            // jsonData = jsonData.slice(0,500); // Limita l'import a 500 record
-            // jsonData = jsonData.slice(0, this.maxRecords); // ✅ Usa il numero specificato dall'utente
-
+            jsonData = jsonData.slice(11); // Rimuove le prime 11 righe di header
 
             if (!jsonData[0]) {
                 console.error('❌ Nessuna intestazione trovata.');
@@ -140,6 +136,9 @@ export default class ExcelFileUploader extends LightningElement {
             });
 
             this.data = processedData;
+
+            console.log("🔄 Chiamata a extractCategories()...");
+            this.extractCategories();
         };
 
         reader.readAsBinaryString(file);
@@ -172,7 +171,7 @@ export default class ExcelFileUploader extends LightningElement {
     
         importAnkerProducts({ productData: dataToImport })
             .then(result => {
-                console.log('📩 Risultato ricevuto da Apex:', result);
+                // console.log('📩 Risultato ricevuto da Apex:', result);
     
                 if (!result || result.length === undefined) {
                     console.error('❌ La risposta di Apex non è valida:', result);
@@ -196,6 +195,11 @@ export default class ExcelFileUploader extends LightningElement {
     }
     
     handleResetDataset() {
+        if (!window.confirm('Sei sicuro di voler eliminare il dataset? Questa operazione è irreversibile.')) {
+            console.log('❌ Operazione annullata dall\'utente.');
+            return;
+        }
+    
         console.log('🔄 handleResetDataset() chiamato!');
     
         resetAnkerProducts()
@@ -215,6 +219,105 @@ export default class ExcelFileUploader extends LightningElement {
             })
             .finally(() => {
                 console.log('🔚 Operazione di reset completata.');
+            });
+    }
+    
+    handleResetCategory() {
+        if (!window.confirm('Sei sicuro di voler eliminare l\'attuale mappatura delle categorie? Questa operazione è irreversibile.')) {
+            console.log('❌ Operazione annullata dall\'utente.');
+            return;
+        }
+        console.log('🔄 handleResetCategory() chiamato!');
+    
+        resetAnkerCategories()
+            .then(() => {
+                console.log('✅ Reset categorie completato con successo!');
+                this.importMessage = '✅ Categorie eliminate con successo!';
+            })
+            .catch(error => {
+                console.error('❌ Errore durante il reset delle categorie:', error);
+    
+                let errorMessage = '❌ Errore durante il reset delle categorie.';
+                if (error.body) {
+                    errorMessage = `❌ Errore: ${JSON.stringify(error.body)}`;
+                }
+    
+                this.importMessage = errorMessage;
+            })
+            .finally(() => {
+                console.log('🔚 Operazione di reset delle categorie completata.');
+            });
+    }    
+
+    extractCategories() {
+        // console.log("🔍 Dati disponibili per l'estrazione categorie:", JSON.stringify(this.data, null, 2));
+    
+        if (!this.data || this.data.length === 0) {
+            console.error("❌ Nessun dato disponibile per estrarre le categorie.");
+            return;
+        }
+    
+        console.log("🔍 Primo record di this.data:", JSON.stringify(this.data[0], null, 2));
+
+        // ✅ Creiamo una copia "pulita" del primo record per evitare problemi con i Proxy
+        let firstRow = JSON.parse(JSON.stringify(this.data[0], null, 2));
+        console.log("🔍 Primo record di this.data parsed:", firstRow)
+
+        // Stampiamo i nomi delle colonne effettivamente presenti nel file Excel
+        let firstRowKeys = Object.keys(firstRow);
+        console.log("🔍 Nomi delle colonne disponibili nel file Excel 2:", firstRowKeys);
+
+        // Normalizziamo le chiavi per gestire maiuscole/minuscole e spazi extra
+        let normalizedKeys = firstRowKeys.reduce((acc, key) => {
+            acc[key.toLowerCase().trim()] = key;
+            return acc;
+        }, {});
+    
+        console.log("🔍 Mappatura chiavi normalizzate:", normalizedKeys);
+
+        // Troviamo la colonna che corrisponde a "Main Category" (indipendentemente da maiuscole/minuscole)
+        let mainCategoryKey = normalizedKeys["main category"];
+    
+        if (!mainCategoryKey) {
+            console.error("❌ Colonna 'Main Category' non trovata nel file Excel! Verifica il nome esatto.");
+            return;
+        }
+    
+        let categorySet = new Set();
+
+        // Estrarre le categorie uniche dal file caricato
+        this.data.forEach(product => {
+            if (product.hasOwnProperty('Main Category')) {
+                if (product['Main Category'] && product['Main Category'].trim() !== '') {
+                    categorySet.add(product['Main Category']);
+                } else {
+                    console.warn("⚠️ Prodotto senza categoria rilevato, assegnando categoria vuota:", product);
+                    categorySet.add(""); // Aggiunge una categoria vuota
+                }
+            } else {
+                console.warn("⚠️ Prodotto senza chiave 'Main Category', assegnando categoria vuota:", product);
+                categorySet.add(""); // Aggiunge una categoria vuota
+            }
+        });
+    
+        let categoryList = [...categorySet];
+    
+        // categoryList.forEach((category, index) => {
+        //     console.log(`📌 Categoria ${index + 1}: ${category}`);
+        // });        
+
+        if (categoryList.length === 0) {
+            console.warn("⚠️ Nessuna categoria valida estratta.");
+            return;
+        }
+    
+        // Chiamata Apex per salvare le categorie in Salesforce
+        importAnkerCategories({ categoryNames: categoryList })
+            .then(() => {
+                console.log('✅ Categorie salvate correttamente in Salesforce.');
+            })
+            .catch(error => {
+                console.error('❌ Errore nel salvataggio delle categorie:', error);
             });
     }
     

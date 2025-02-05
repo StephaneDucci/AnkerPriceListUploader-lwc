@@ -79,5 +79,71 @@ public with sharing class AnkerProductImporter {
             throw new AuraHandledException('Errore durante la cancellazione: ' + e.getMessage());
         }
     }
+
+    @AuraEnabled
+    public static void importAnkerCategories(List<String> categoryNames) {
+        if (categoryNames == null || categoryNames.isEmpty()) {
+            throw new AuraHandledException('Nessuna categoria fornita per l\'import.');
+        }
     
+        Set<String> existingCategories = new Set<String>();
+    
+        // Recupera tutte le categorie esistenti e le normalizza in lowercase+trim
+        for (Anker_Category__c cat : [SELECT Name FROM Anker_Category__c]) {
+            existingCategories.add(cat.Name.trim().toLowerCase());
+        }
+    
+        List<Anker_Category__c> categoriesToInsert = new List<Anker_Category__c>();
+    
+        for (String categoryName : categoryNames) {
+            if (String.isBlank(categoryName)) {
+                continue; // Evita nomi vuoti o null
+            }
+            String cleanCategoryName = categoryName.trim().toLowerCase();
+            
+            // Se la categoria esiste già, la ignoriamo
+            if (existingCategories.contains(cleanCategoryName)) {
+                System.debug('ℹ️ Categoria già esistente: ' + categoryName);
+                continue;
+            }
+    
+            // Creiamo la nuova categoria
+            Anker_Category__c newCategory = new Anker_Category__c();
+            newCategory.Name = categoryName.trim(); // Mantiene la formattazione originale per la UI
+            categoriesToInsert.add(newCategory);
+    
+            // Aggiorniamo l'insieme per evitare duplicati nello stesso batch
+            existingCategories.add(cleanCategoryName);
+        }
+    
+        if (!categoriesToInsert.isEmpty()) {
+            try {
+                Database.insert(categoriesToInsert, false); // `false` permette di ignorare gli errori su singole righe
+                System.debug('✅ ' + categoriesToInsert.size() + ' nuove categorie inserite.');
+            } catch (DmlException e) {
+                System.debug('❌ Errore durante l\'inserimento: ' + e.getMessage());
+                throw new AuraHandledException('Errore durante l\'inserimento: ' + e.getMessage());
+            }
+        } else {
+            System.debug('⚠️ Nessuna nuova categoria da inserire.');
+        }
+    }
+
+    @AuraEnabled
+    public static void resetAnkerCategories() {
+        try {
+            System.debug('🔄 Tentativo di eliminazione di tutti i record Anker_Category__c...');
+            Integer recordsDeleted = [SELECT COUNT() FROM Anker_Category__c];
+    
+            if (recordsDeleted > 0) {
+                delete [SELECT Id FROM Anker_Category__c];
+                System.debug('✅ Eliminati ' + recordsDeleted + ' record.');
+            } else {
+                System.debug('⚠️ Nessun record da eliminare.');
+            }
+        } catch (DmlException e) {
+            System.debug('❌ Errore durante la cancellazione dei record: ' + e.getMessage());
+            throw new AuraHandledException('Errore durante la cancellazione: ' + e.getMessage());
+        }
+    }
 }
