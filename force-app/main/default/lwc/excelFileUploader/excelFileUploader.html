@@ -1,40 +1,73 @@
 <template>
     <lightning-card title="Upload File Excel">
         <div class="slds-m-around_medium">
-            <!-- Selezione del file Excel -->
-            <lightning-input type="file" accept=".xls,.xlsx" label="Seleziona un file" 
-                onchange={handleFileChange} class="custom-file-input">
-            </lightning-input>
-
-            <!-- Visualizzazione del nome del file selezionato -->
-            <p class="file-name-display slds-m-top_small">📄 File selezionato: <strong>{fileName}</strong></p>
-
-            <!-- Sezione per specificare il numero massimo di record e opzione per includere prodotti non disponibili -->
-            <div class="slds-grid slds-wrap slds-gutters slds-m-top_medium">
+            <!-- Griglia a due colonne -->
+            <div class="slds-grid slds-gutters">
+                <!-- Colonna sinistra: Interfaccia di upload e azioni -->
                 <div class="slds-col slds-size_1-of-2">
-                    <!-- Input per specificare il numero massimo di record da importare -->
-                    <lightning-input type="number" label="Max records to import"
-                        value={maxRecords} onchange={handleMaxRecordsChange} 
-                        class="slds-m-bottom_medium" style="width: 150px;">
+                    <!-- Selezione del file Excel -->
+                    <lightning-input type="file" accept=".xls,.xlsx" label="Seleziona un file" 
+                        onchange={handleFileChange} class="custom-file-input">
                     </lightning-input>
+
+                    <!-- Visualizzazione del nome del file selezionato -->
+                    <p class="file-name-display slds-m-top_small">
+                        📄 File selezionato: <strong>{fileName}</strong>
+                    </p>
+
+                    <!-- Sezione per specificare il numero massimo di record e opzione per includere prodotti non disponibili -->
+                    <div class="slds-grid slds-wrap slds-gutters slds-m-top_medium slds-grid_vertical-align-center" style="width:500px">
+                        <div class="slds-col slds-size_1-of-2">
+                            <!-- Input per specificare il numero massimo di record da importare -->
+                            <lightning-input type="number" label="Max records to import"
+                                value={maxRecords} onchange={handleMaxRecordsChange} 
+                                class="slds-m-bottom_medium" style="max-width: 200px;">
+                            </lightning-input>
+                        </div>
+                        <div class="slds-col slds-size_1-of-2">
+                            <!-- Checkbox per includere o escludere prodotti non disponibili -->
+                            <div class="slds-m-left_medium">
+                                <lightning-input type="checkbox" label="Includere i prodotti N/A?" 
+                                    checked={includeUnavailable} onchange={handleIncludeUnavailableChange}>
+                                </lightning-input>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pulsanti di azione -->
+                    <div class="slds-m-top_medium">
+                        <lightning-button label="Importa" onclick={handleImport} variant="brand"></lightning-button>
+                        <lightning-button label="Reset Old Anker Product List" onclick={handleResetDataset} variant="destructive" class="slds-m-left_small"></lightning-button>    
+                        <lightning-button label="Reset Anker Categories" onclick={handleResetCategory} variant="destructive" class="slds-m-left_small"></lightning-button>            
+                    </div>
+
+                    <!-- Messaggio di conferma o errore sull'importazione -->
+                    <p class="slds-m-top_medium" if:true={importMessage}>{importMessage}</p>
                 </div>
-                <div class="slds-col slds-size_1-of-2 slds-align_absolute-center">
-                    <!-- Checkbox per includere o escludere prodotti non disponibili -->
-                    <lightning-input type="checkbox" label="Includere i prodotti N/A?" 
-                        checked={includeUnavailable} onchange={handleIncludeUnavailableChange}>
-                    </lightning-input>
+
+                <!-- Colonna destra: Informazioni per l'utente -->
+                <div class="slds-col slds-size_1-of-2 slds-p-left_large">
+                    <h2 class="slds-text-heading_medium">ℹ️ Informazioni Utili</h2>
+                    <p class="slds-m-top_small">
+                        🔹 <strong>Seleziona un file Excel</strong>: Assicurati che il file contenga le colonne corrette.
+                    </p>
+                    <p class="slds-m-top_small">
+                        🔹 <strong>Max records to import</strong>: Definisci il numero massimo di prodotti da importare.
+                    </p>
+                    <p class="slds-m-top_small">
+                        🔹 <strong>Includere i prodotti N/A?</strong>: Se attivato, anche i prodotti non disponibili verranno importati.
+                    </p>
+                    <p class="slds-m-top_small">
+                        🔹 <strong>Categorie Anker</strong>: con il caricamento del listino vengono esportate le categorie. Ricorda di mapparle correttamente.
+                    </p>
+                    <p class="slds-m-top_small">
+                        🔹 <strong>Pulsante "Importa"</strong>: Avvia il processo di importazione del file selezionato.
+                    </p>
+                    <p class="slds-m-top_small">
+                        🔹 <strong>Pulsanti "Reset"</strong>: Eliminano i dati precedenti per garantire una nuova importazione pulita.
+                    </p>
                 </div>
             </div>
-
-            <!-- Pulsanti di azione: Importa e Reset -->
-            <div class="slds-m-top_medium">
-                <lightning-button label="Importa" onclick={handleImport} variant="brand"></lightning-button>
-                <lightning-button label="Reset Old Anker Product List" onclick={handleResetDataset} variant="destructive" class="slds-m-left_small"></lightning-button>    
-                <lightning-button label="Reset Anker Categories" onclick={handleResetCategory} variant="destructive" class="slds-m-left_small"></lightning-button>            
-            </div>
-
-            <!-- Messaggio di conferma o errore sull'importazione -->
-            <p class="slds-m-top_medium" if:true={importMessage}>{importMessage}</p>
         </div>
     </lightning-card>
 </template>
