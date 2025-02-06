@@ -162,7 +162,7 @@ export default class ExcelFileUploader extends LightningElement {
             this.includeUnavailable || (commentKey && String(product[commentKey]).trim().toLowerCase() !== 'currently not available')
         );
         
-        console.log('📊 Dati totali dopo il filtro:', filteredData.length);
+        console.log('📊 Dati totali dopo il filtro N/A:', filteredData.length);
         
         // ✅ Applica il limite dei record dopo il filtro
         let dataToImport = filteredData.slice(0, this.maxRecords);
@@ -257,7 +257,7 @@ export default class ExcelFileUploader extends LightningElement {
             return;
         }
     
-        console.log("🔍 Primo record di this.data:", JSON.stringify(this.data[0], null, 2));
+        //console.log("🔍 Primo record di this.data:", JSON.stringify(this.data[0], null, 2));
 
         // ✅ Creiamo una copia "pulita" del primo record per evitare problemi con i Proxy
         let firstRow = JSON.parse(JSON.stringify(this.data[0], null, 2));
@@ -291,7 +291,7 @@ export default class ExcelFileUploader extends LightningElement {
                 if (product['Main Category'] && product['Main Category'].trim() !== '') {
                     categorySet.add(product['Main Category']);
                 } else {
-                    console.warn("⚠️ Prodotto senza categoria rilevato, assegnando categoria vuota:", product);
+                    //console.warn("⚠️ Prodotto senza categoria rilevato, assegnando categoria vuota:", product);
                     categorySet.add(""); // Aggiunge una categoria vuota
                 }
             } else {

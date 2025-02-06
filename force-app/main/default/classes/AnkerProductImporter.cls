@@ -3,52 +3,58 @@ public with sharing class AnkerProductImporter {
     @AuraEnabled
     public static List<Anker_Product__c> importAnkerProducts(List<Map<String, String>> productData) {
         List<Anker_Product__c> productsToInsert = new List<Anker_Product__c>();
-
+        Map<String, String> categoryMapping = new Map<String, String>();
+    
         System.debug('📊 Numero di record ricevuti: ' + productData.size());
-
-        // Elimina tutti i record esistenti prima dell'import
-        try {
-            delete [SELECT Id FROM Anker_Product__c];
-            System.debug('🗑️ Tutti i record precedenti sono stati eliminati.');
-        } catch (DmlException e) {
-            System.debug('❌ Errore nell\'eliminazione dei vecchi record: ' + e.getMessage());
-            return new List<Anker_Product__c>();
+    
+        // Recuperiamo la mappatura delle categorie
+        for (Anker_Category__c category : [SELECT Name, Coppo_Category__c FROM Anker_Category__c]) {
+            categoryMapping.put(category.Name, category.Coppo_Category__c);
         }
-
+        System.debug('🔄 Mappatura categorie caricata: ' + categoryMapping.size());
+    
         for (Map<String, String> row : productData) {
             try {
-                if (row.containsKey('Alc %') && (row.get('Alc %') == null || row.get('Alc %').trim() == '' || Decimal.valueOf(row.get('Alc %')) == 0)) {
+                // Controlliamo se la categoria del fornitore esiste nella mappatura
+                String supplierCategory = row.get('Main Category');
+                if (supplierCategory == null || supplierCategory.trim() == '' || !categoryMapping.containsKey(supplierCategory)) {
+                    System.debug('❌ Record scartato: Categoria non riconosciuta - ' + supplierCategory);
                     continue;
                 }
-                if (row.containsKey('Main Category') && (row.get('Main Category') == null || row.get('Main Category').trim() == '')) {
+    
+                // Recuperiamo la nostra categoria mappata
+                String mappedCategory = categoryMapping.get(supplierCategory);
+                if (mappedCategory == null || mappedCategory.trim() == '' || mappedCategory == 'NOT TO IMPORT') {
+                    System.debug('❌ Record scartato: Categoria non trattata - ' + supplierCategory);
                     continue;
                 }
-
+    
+                // Creiamo il prodotto con la categoria mappata
                 Anker_Product__c product = new Anker_Product__c();
                 product.SKU__c = row.get('SKU');
-                product.Description__c = row.get('Description');
-                product.Case_Size__c = row.containsKey('Case size') && row.get('Case size') != null && row.get('Case size') != '' ? Decimal.valueOf(row.get('Case size')) : null;
-                product.Size__c = row.containsKey('Size') && row.get('Size') != null && row.get('Size') != '' ? Decimal.valueOf(row.get('Size')) : null;
-                product.Alc__c = row.containsKey('Alc %') && row.get('Alc %') != null && row.get('Alc %') != '' ? Decimal.valueOf(row.get('Alc %')) : null;
-                product.Price_Bottle__c = row.containsKey('Price bottle') && row.get('Price bottle') != null && row.get('Price bottle') != '' ? Decimal.valueOf(row.get('Price bottle')) : null;
+                product.name = row.get('Description');
+                product.Case_Size__c = row.containsKey('Case size') ? Decimal.valueOf(row.get('Case size')) : null;
+                product.Size__c = row.containsKey('Size') ? Decimal.valueOf(row.get('Size')) : null;
+                product.Alc__c = row.containsKey('Alc %') ? Decimal.valueOf(row.get('Alc %')) : null;
+                product.Price_Bottle__c = row.containsKey('Price bottle') ? Decimal.valueOf(row.get('Price bottle')) : null;
                 product.Comment_Remark__c = row.get('Comment/remark');
-                product.Main_Category__c = row.get('Main Category');
+                product.Main_Category__c = mappedCategory; // <-- Ora assegniamo la categoria corretta
                 product.Sub_Category__c = row.get('Sub Category');
                 product.COO__c = row.get('COO');
                 product.Barcode_Bottle__c = row.get('Barcode bottle');
-                
+    
                 if (row.containsKey('Barcode Outercase') && row.get('Barcode Outercase') != null && row.get('Barcode Outercase').length() > 14) {
                     product.Barcode_Outercase__c = null;
                 } else {
                     product.Barcode_Outercase__c = row.get('Barcode Outercase');
                 }
-
+    
                 productsToInsert.add(product);
             } catch (Exception e) {
-                System.debug('❌ Errore nella creazione del record: ' + e.getMessage());
+                System.debug('❌ Errore nella creazione del record: ' + e.getMessage() + ' - ' + row.get('Description'));
             }
         }
-
+    
         if (!productsToInsert.isEmpty()) {
             try {
                 System.debug('📊 Tentativo di inserimento di ' + productsToInsert.size() + ' prodotti.');
@@ -58,10 +64,10 @@ public with sharing class AnkerProductImporter {
                 System.debug('❌ Errore nell\'inserimento dei record: ' + e.getMessage());
             }
         }
-
+    
         return productsToInsert;
     }
-
+    
     @AuraEnabled
     public static void resetAnkerProducts() {
         try {
