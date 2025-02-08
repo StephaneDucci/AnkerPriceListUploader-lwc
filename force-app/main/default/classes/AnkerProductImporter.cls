@@ -29,16 +29,26 @@ public with sharing class AnkerProductImporter {
                     continue;
                 }
     
+                // Recuperiamo i valori di Size e Price bottle
+                Decimal size = row.containsKey('Size') && row.get('Size') != null ? Decimal.valueOf(row.get('Size')) : null;
+                Decimal priceBottle = row.containsKey('Price bottle') && row.get('Price bottle') != null ? Decimal.valueOf(row.get('Price bottle')) : null;
+    
+                // Filtriamo i record che hanno Size >= 0.5 e Price bottle < 5€
+                if (size != null && priceBottle != null && size >= 0.5 && priceBottle < 5) {
+                    System.debug('❌ Record scartato, prodotto di valore troppo basso - ' + row.get('Description'));
+                    continue;
+                }
+    
                 // Creiamo il prodotto con la categoria mappata
                 Anker_Product__c product = new Anker_Product__c();
                 product.SKU__c = row.get('SKU');
                 product.name = row.get('Description');
                 product.Case_Size__c = row.containsKey('Case size') ? Decimal.valueOf(row.get('Case size')) : null;
-                product.Size__c = row.containsKey('Size') ? Decimal.valueOf(row.get('Size')) : null;
+                product.Size__c = size;
                 product.Alc__c = row.containsKey('Alc %') ? Decimal.valueOf(row.get('Alc %')) : null;
-                product.Price_Bottle__c = row.containsKey('Price bottle') ? Decimal.valueOf(row.get('Price bottle')) : null;
+                product.Price_Bottle__c = priceBottle;
                 product.Comment_Remark__c = row.get('Comment/remark');
-                product.Main_Category__c = mappedCategory; // <-- Ora assegniamo la categoria corretta
+                product.Main_Category__c = mappedCategory;
                 product.Sub_Category__c = row.get('Sub Category');
                 product.COO__c = row.get('COO');
                 product.Barcode_Bottle__c = row.get('Barcode bottle');
