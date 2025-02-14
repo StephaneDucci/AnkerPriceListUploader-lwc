@@ -1,70 +1,121 @@
 public with sharing class AnkerProductImporter {
 
+
     @AuraEnabled
-    public static List<Anker_Product__c> importAnkerProducts(List<Map<String, String>> productData) {
-        List<Anker_Product__c> productsToInsert = new List<Anker_Product__c>();
-        Map<String, String> categoryMapping = new Map<String, String>();
+    public static List<Product2> importAnkerProducts(List<Map<String, String>> productData) {
+    
+        // Le liste che conterranno i prodotti da inserire e quelli da aggiornare
+        List<Product2> productsToInsert = new List<Product2>();
+        List<Product2> productsToUpdate = new List<Product2>();
+        
+        // Mappature
+        Map<String, String> categoryMapping = new Map<String, String>();  // Mappa categorie
+        Map<String, Product2> existingProductsMap = new Map<String, Product2>();  // Mappa prodotti esistenti
+        Set<String> importedSKUs = new Set<String>();  // Set con gli SKU importati
     
         System.debug('📊 Numero di record ricevuti: ' + productData.size());
+        
+        // Recupera il Record Type ID corretto
+        Id importedMaltRTId = [SELECT Id FROM RecordType WHERE DeveloperName = 'Imported_Malt' AND SObjectType = 'Product2' LIMIT 1].Id;
+
+        // Ora usa l'ID corretto nella query sui prodotti
+        List<Product2> existingProducts = [SELECT Id, Anker_SKU__c, Name, Price__c, IsActive FROM Product2 WHERE RecordTypeId = :importedMaltRTId];
+        System.debug('Prodotti Anker presenti in product2 - ' + existingProducts.size());
+        
+        // Popoliamo la mappa dei prodotti esistenti
+        for (Product2 prod : existingProducts) {
+            existingProductsMap.put(prod.Anker_SKU__c, prod);
+        }
     
         // Recuperiamo la mappatura delle categorie
         for (Anker_Category__c category : [SELECT Name, Coppo_Category__c FROM Anker_Category__c]) {
             categoryMapping.put(category.Name, category.Coppo_Category__c);
         }
-        System.debug('🔄 Mappatura categorie caricata: ' + categoryMapping.size());
     
+        // Iteriamo sui prodotti importati
         for (Map<String, String> row : productData) {
             try {
                 // Controlliamo se la categoria del fornitore esiste nella mappatura
                 String supplierCategory = row.get('Main Category');
-                if (supplierCategory == null || supplierCategory.trim() == '' || !categoryMapping.containsKey(supplierCategory)) {
+                if (String.isBlank(supplierCategory) || !categoryMapping.containsKey(supplierCategory)) {
                     System.debug('❌ Record scartato: Categoria non riconosciuta - ' + supplierCategory);
                     continue;
                 }
     
-                // Recuperiamo la nostra categoria mappata
+                // Recuperiamo la categoria mappata
                 String mappedCategory = categoryMapping.get(supplierCategory);
-                if (mappedCategory == null || mappedCategory.trim() == '' || mappedCategory == 'NOT TO IMPORT') {
+                if (String.isBlank(mappedCategory) || mappedCategory == 'NOT TO IMPORT') {
                     System.debug('❌ Record scartato: Categoria non trattata - ' + supplierCategory);
                     continue;
                 }
-    
-                // Recuperiamo i valori di Size e Price bottle
+
+                // Filtriamo i record che hanno Size >= 0.5 e Price bottle < 5€
                 Decimal size = row.containsKey('Size') && row.get('Size') != null ? Decimal.valueOf(row.get('Size')) : null;
                 Decimal priceBottle = row.containsKey('Price bottle') && row.get('Price bottle') != null ? Decimal.valueOf(row.get('Price bottle')) : null;
-    
-                // Filtriamo i record che hanno Size >= 0.5 e Price bottle < 5€
                 if (size != null && priceBottle != null && size >= 0.5 && priceBottle < 5) {
                     System.debug('❌ Record scartato, prodotto di valore troppo basso - ' + row.get('Description'));
                     continue;
                 }
-    
-                // Creiamo il prodotto con la categoria mappata
-                Anker_Product__c product = new Anker_Product__c();
-                product.SKU__c = row.get('SKU');
-                product.name = row.get('Description');
-                product.Case_Size__c = row.containsKey('Case size') ? Decimal.valueOf(row.get('Case size')) : null;
-                product.Size__c = size;
-                product.Alc__c = row.containsKey('Alc %') ? Decimal.valueOf(row.get('Alc %')) : null;
-                product.Price_Bottle__c = priceBottle;
-                product.Comment_Remark__c = row.get('Comment/remark');
-                product.Main_Category__c = mappedCategory;
-                product.Sub_Category__c = row.get('Sub Category');
-                product.COO__c = row.get('COO');
-                product.Barcode_Bottle__c = row.get('Barcode bottle');
-    
-                if (row.containsKey('Barcode Outercase') && row.get('Barcode Outercase') != null && row.get('Barcode Outercase').length() > 14) {
-                    product.Barcode_Outercase__c = null;
+
+                // Popoliamo il set degli SKU importati
+                String sku = row.get('SKU');
+                importedSKUs.add(sku);
+
+                if (existingProductsMap.containsKey(sku)) { 
+                    // Il prodotto esiste già → aggiornamento
+                    Product2 existingProduct = existingProductsMap.get(sku);
+                    existingProduct.isActive = true;
+                    existingProduct.Price__c = priceBottle;
+
+                    productsToUpdate.add(existingProduct);
                 } else {
-                    product.Barcode_Outercase__c = row.get('Barcode Outercase');
+                    // Creiamo un nuovo prodotto
+                    Product2 newProduct = new Product2();
+                    newProduct.Anker_SKU__c = sku;
+                    newProduct.Name = row.get('Description');
+                    newProduct.Category__c = mappedCategory;
+                    newProduct.isActive = true;
+                    try {
+                        newProduct.Case_Size__c = (row.containsKey('Case size') ? Decimal.valueOf(row.get('Case size')) : null);
+                    } catch (Exception e) {
+                        System.debug('❌ ERRORE conversione "Case Size": ' + e.getMessage() + ' - Valore originale: "' + row.get('Case size') + '"');
+                    }
+                    try {
+                        newProduct.Vol__c = (row.containsKey('Alc %') ? Decimal.valueof(row.get('Alc %')) : null);
+                    } catch (Exception e) {
+                        System.debug('❌ ERRORE conversione "Alc %": ' + e.getMessage() + ' - Valore originale: "' + row.get('Alc %') + '"');
+                    }
+                    newProduct.Size__c = size;
+                    newProduct.Price__c = priceBottle;
+                    newProduct.Barcode__c = row.get('Barcode bottle');
+                    newProduct.RecordTypeId = importedMaltRTId;
+
+                    productsToInsert.add(newProduct);
                 }
-    
-                productsToInsert.add(product);
             } catch (Exception e) {
-                System.debug('❌ Errore nella creazione del record: ' + e.getMessage() + ' - ' + row.get('Description'));
+                System.debug('❌ Errore nella creazione del record: ' + e.getMessage() + ' - ' + row.get('SKU'));
             }
         }
-    
+
+        // Disattivo i prodotti non presenti nel listino ma già registrati in Product2
+        for (Product2 existingProduct : existingProducts) {
+            if (!importedSKUs.contains(existingProduct.Anker_SKU__c)) {
+                existingProduct.IsActive = false;
+                productsToUpdate.add(existingProduct);
+            }
+        }
+
+        // **Effettuiamo gli aggiornamenti e gli inserimenti in batch**
+        if (!productsToUpdate.isEmpty()) {
+            try {
+                System.debug('📊 Tentativo di aggiornamento di ' + productsToUpdate.size() + ' prodotti.');
+                update productsToUpdate;
+                System.debug('✅ ' + productsToUpdate.size() + ' prodotti aggiornati con successo!');
+            } catch (DmlException e) {
+                System.debug('❌ Errore nell\'aggiornamento dei record: ' + e.getMessage());
+            }
+        }
+
         if (!productsToInsert.isEmpty()) {
             try {
                 System.debug('📊 Tentativo di inserimento di ' + productsToInsert.size() + ' prodotti.');
@@ -77,7 +128,7 @@ public with sharing class AnkerProductImporter {
     
         return productsToInsert;
     }
-    
+
     @AuraEnabled
     public static void resetAnkerProducts() {
         try {
